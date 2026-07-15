@@ -354,12 +354,22 @@ function parseParallel(name) {
 }
 
 function buildQuery(card) {
+  // Pro SP Authentic Future Watch - použij název série bez čísla karty
+  const name = card.name || '';
+  const nameLower = name.toLowerCase();
+  
+  // Detekuj typ karty z názvu
+  let setHint = null;
+  if (nameLower.includes('future watch limited')) setHint = 'Future Watch Limited';
+  else if (nameLower.includes('future watch auto')) setHint = 'Future Watch Auto';
+  else if (nameLower.includes('future watch')) setHint = 'Future Watch';
+  else if (card.set) setHint = card.set.split(' ').slice(0,3).join(' ');
+
   return [
     card.player,
     card.year,
-    card.set ? card.set.split(' ').slice(0,4).join(' ') : null,
-    card.cardNo ? '#' + card.cardNo : null,
-    card.printRun ? '/' + card.printRun : null,
+    setHint,
+    card.printRun && !setHint?.includes('Future Watch') ? '/' + card.printRun : null,
     card.isAuto ? 'auto' : null,
   ].filter(Boolean).join(' ').slice(0, 100);
 }
