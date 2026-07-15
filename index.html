@@ -389,42 +389,30 @@ async function fetchEbayPrice(card) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
-    // Klíčová slova pro vyloučení nerelevantních karet
-    const excludeKeywords = ['game used', 'patch', 'jumbo', 'relic', 'tag', 'case hit'];
-    // Pokud nehledáme auto, vyloučíme auto karty
-    const excludeAuto = !card.isAuto;
-
     const playerLast = (card.player || '').toLowerCase().split(' ').pop();
-    const playerFirst = (card.player || '').toLowerCase().split(' ')[0];
-
     const prices = [];
-    const items = doc.querySelectorAll('.s-item');
 
-    for (const item of items) {
-      const titleEl = item.querySelector('.s-item__title, [class*="title"]');
-      if (!titleEl) continue;
-      const title = titleEl.textContent.toLowerCase();
+    for (const item of doc.querySelectorAll('.s-item')) {
+      const titleEl = item.querySelector('.s-item__title');
+      const title = (titleEl?.textContent || '').toLowerCase();
+      if (!title || title.includes('shop on ebay')) continue;
 
       // Musí obsahovat příjmení hráče
-      if (playerLast && !title.includes(playerLast)) continue;
-
-      // Vyloučit nerelevantní typy
-      if (excludeKeywords.some(k => title.includes(k))) continue;
-      if (excludeAuto && title.includes('auto') && !title.includes('authentic')) continue;
+      if (playerLast && playerLast.length > 2 && !title.includes(playerLast)) continue;
 
       const priceEl = item.querySelector('.s-card__price, .s-item__price');
       if (!priceEl || priceEl.classList.contains('strikethrough')) continue;
 
-      const raw = priceEl.textContent.replace(/[\s, ]/g, '');
-      const czk = raw.match(/(\d+\.?\d*)CZK/i) || raw.match(/(\d+\.?\d*)K[cč]/i);
-      const usd = raw.match(/\$(\d+\.?\d*)/);
+      const raw = priceEl.textContent.replace(/\s/g, '');
+      const czk = raw.match(/(\d+[.,]?\d*)CZK/i);
+      const usd = raw.match(/\$(\d+[.,]?\d*)/);
 
       if (czk) {
-        const v = parseFloat(czk[1]);
-        if (v > 2 && v < 50000) prices.push({ val: v, cur: 'CZK', title: title.slice(0,50) });
+        const v = parseFloat(czk[1].replace(',', '.'));
+        if (v > 2 && v < 100000) prices.push({ val: v, cur: 'CZK' });
       } else if (usd) {
-        const v = parseFloat(usd[1]);
-        if (v > 0.1 && v < 2000) prices.push({ val: v, cur: 'USD', title: title.slice(0,50) });
+        const v = parseFloat(usd[1].replace(',', '.'));
+        if (v > 0.1 && v < 5000) prices.push({ val: v, cur: 'USD' });
       }
     }
 
@@ -435,7 +423,7 @@ async function fetchEbayPrice(card) {
     let priceCzk, count, label;
 
     const calcMedian = (arr) => {
-      arr.sort((a,b) => a.val - b.val);
+      arr.sort((a, b) => a.val - b.val);
       return arr[Math.floor(arr.length / 2)].val;
     };
 
@@ -453,7 +441,7 @@ async function fetchEbayPrice(card) {
       return null;
     }
 
-    return { price: priceCzk, source: label, query: q };
+        return { price: priceCzk, source: label, query: q };
   } catch(e) {
     console.warn('eBay fetch:', e.message);
     return null;
