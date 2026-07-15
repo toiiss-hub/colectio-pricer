@@ -376,50 +376,57 @@ async function fetchEbayPrice(card) {
     if (!r.ok) return null;
     const html = await r.text();
 
-    // Parsuj ceny z HTML
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
+    // Klíčová slova pro vyloučení nerelevantních karet
+    const excludeKeywords = ['game used', 'patch', 'jumbo', 'relic', 'tag', 'case hit'];
+    // Pokud nehledáme auto, vyloučíme auto karty
+    const excludeAuto = !card.isAuto;
+
+    const playerLast = (card.player || '').toLowerCase().split(' ').pop();
+    const playerFirst = (card.player || '').toLowerCase().split(' ')[0];
+
     const prices = [];
-    // Nové selektory eBay
-    for (const el of doc.querySelectorAll('.s-card__price, .s-item__price')) {
-      if (el.classList.contains('strikethrough')) continue;
-      const raw = el.textContent.replace(/[\s,]/g, '');
+    const items = doc.querySelectorAll('.s-item');
+
+    for (const item of items) {
+      const titleEl = item.querySelector('.s-item__title, [class*="title"]');
+      if (!titleEl) continue;
+      const title = titleEl.textContent.toLowerCase();
+
+      // Musí obsahovat příjmení hráče
+      if (playerLast && !title.includes(playerLast)) continue;
+
+      // Vyloučit nerelevantní typy
+      if (excludeKeywords.some(k => title.includes(k))) continue;
+      if (excludeAuto && title.includes('auto') && !title.includes('authentic')) continue;
+
+      const priceEl = item.querySelector('.s-card__price, .s-item__price');
+      if (!priceEl || priceEl.classList.contains('strikethrough')) continue;
+
+      const raw = priceEl.textContent.replace(/[\s, ]/g, '');
+      const czk = raw.match(/(\d+\.?\d*)CZK/i) || raw.match(/(\d+\.?\d*)K[cč]/i);
       const usd = raw.match(/\$(\d+\.?\d*)/);
-      const czk = raw.match(/(\d+\.?\d*)CZK/i);
-      if (czk) { const v = parseFloat(czk[1]); if (v > 5) prices.push({ val: v, cur: 'CZK' }); }
-      else if (usd) { const v = parseFloat(usd[1]); if (v > 0.5) prices.push({ val: v, cur: 'USD' }); }
+
+      if (czk) {
+        const v = parseFloat(czk[1]);
+        if (v > 2 && v < 50000) prices.push({ val: v, cur: 'CZK', title: title.slice(0,50) });
+      } else if (usd) {
+        const v = parseFloat(usd[1]);
+        if (v > 0.1 && v < 2000) prices.push({ val: v, cur: 'USD', title: title.slice(0,50) });
+      }
     }
 
     if (!prices.length) return null;
 
-    // Filtruj výsledky - zkontroluj jestli title obsahuje jméno hráče
-    const playerLower = (card.player || '').toLowerCase().split(' ')[1] || ''; // příjmení
-    const allItems = Array.from(doc.querySelectorAll('.s-item'));
-    const filteredPrices = [];
-    for (const item of allItems) {
-      const title = (item.querySelector('.s-item__title, [class*="title"]')?.textContent || '').toLowerCase();
-      if (playerLower && title && !title.includes(playerLower)) continue;
-      const priceEl = item.querySelector('.s-card__price, .s-item__price');
-      if (!priceEl || priceEl.classList.contains('strikethrough')) continue;
-      const raw = priceEl.textContent.replace(/[\s,]/g, '');
-      const czk = raw.match(/(\d+\.?\d*)CZK/i);
-      const usd = raw.match(/\$(\d+\.?\d*)/);
-      if (czk) { const v = parseFloat(czk[1]); if (v > 5) filteredPrices.push({val: v, cur: 'CZK'}); }
-      else if (usd) { const v = parseFloat(usd[1]); if (v > 0.5) filteredPrices.push({val: v, cur: 'USD'}); }
-    }
-
-    const finalPrices = filteredPrices.length ? filteredPrices : prices;
-
-    // Vezmi spodní třetinu cen (nejlevnější = nejrelevantnější pro běžné karty)
-    const czks = finalPrices.filter(p => p.cur === 'CZK');
-    const usds = finalPrices.filter(p => p.cur === 'USD');
+    const czks = prices.filter(p => p.cur === 'CZK');
+    const usds = prices.filter(p => p.cur === 'USD');
     let priceCzk, count, label;
 
     const calcMedian = (arr) => {
       arr.sort((a,b) => a.val - b.val);
-      const slice = arr.slice(0, Math.max(1, Math.ceil(arr.length * 0.6)));
-      return slice[Math.floor(slice.length / 2)].val;
+      return arr[Math.floor(arr.length / 2)].val;
     };
 
     if (czks.length) {
