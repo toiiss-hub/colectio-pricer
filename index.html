@@ -393,23 +393,47 @@ async function fetchEbayPrice(card) {
 
     if (!prices.length) return null;
 
-    // Spočítej průměr — preferuj CZK
-    const czks = prices.filter(p => p.cur === 'CZK');
-    const usds = prices.filter(p => p.cur === 'USD');
+    // Filtruj výsledky - zkontroluj jestli title obsahuje jméno hráče
+    const playerLower = (card.player || '').toLowerCase().split(' ')[1] || ''; // příjmení
+    const allItems = Array.from(doc.querySelectorAll('.s-item'));
+    const filteredPrices = [];
+    for (const item of allItems) {
+      const title = (item.querySelector('.s-item__title, [class*="title"]')?.textContent || '').toLowerCase();
+      if (playerLower && title && !title.includes(playerLower)) continue;
+      const priceEl = item.querySelector('.s-card__price, .s-item__price');
+      if (!priceEl || priceEl.classList.contains('strikethrough')) continue;
+      const raw = priceEl.textContent.replace(/[\s,]/g, '');
+      const czk = raw.match(/(\d+\.?\d*)CZK/i);
+      const usd = raw.match(/\$(\d+\.?\d*)/);
+      if (czk) { const v = parseFloat(czk[1]); if (v > 5) filteredPrices.push({val: v, cur: 'CZK'}); }
+      else if (usd) { const v = parseFloat(usd[1]); if (v > 0.5) filteredPrices.push({val: v, cur: 'USD'}); }
+    }
+
+    const finalPrices = filteredPrices.length ? filteredPrices : prices;
+
+    // Vezmi spodní třetinu cen (nejlevnější = nejrelevantnější pro běžné karty)
+    const czks = finalPrices.filter(p => p.cur === 'CZK');
+    const usds = finalPrices.filter(p => p.cur === 'USD');
     let priceCzk, count, label;
 
+    const calcMedian = (arr) => {
+      arr.sort((a,b) => a.val - b.val);
+      const slice = arr.slice(0, Math.max(1, Math.ceil(arr.length * 0.6)));
+      return slice[Math.floor(slice.length / 2)].val;
+    };
+
     if (czks.length) {
-      czks.sort((a,b) => a.val - b.val);
-      const median = czks[Math.floor(czks.length / 2)].val;
+      const median = calcMedian(czks);
       priceCzk = Math.round(median);
       count = czks.length;
       label = `eBay sold (${count}x, ${median.toFixed(0)} Kč)`;
-    } else {
-      usds.sort((a,b) => a.val - b.val);
-      const median = usds[Math.floor(usds.length / 2)].val;
+    } else if (usds.length) {
+      const median = calcMedian(usds);
       priceCzk = Math.round(median * USD_CZK);
       count = usds.length;
       label = `eBay sold (${count}x, $${median.toFixed(2)})`;
+    } else {
+      return null;
     }
 
     return { price: priceCzk, source: label, query: q };
