@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colectio Pricer</title>
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --accent: #c8a84b;
+    --accent2: #e8c870;
+    --text: #e8e8e8;
+    --muted: #666;
+    --green: #4caf7d;
+    --red: #e05252;
+    --font: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { font-size: 20px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+  .logo span { color: var(--text); }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:active { opacity: 0.7; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+
+  main { padding: 16px; max-width: 900px; margin: 0 auto; }
+
+  .config-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .config-bar label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .config-bar input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 8px 12px;
+    font-size: 14px;
+    width: 140px;
+  }
+  .config-bar input:focus { outline: none; border-color: var(--accent); }
+
+  .stats-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    flex: 1;
+    min-width: 100px;
+  }
+  .stat-val { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .progress-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 8px 0; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; width: 0%; }
+  .progress-text { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .filter-bar input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 8px 12px;
+    font-size: 14px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .filter-bar input:focus { outline: none; border-color: var(--accent); }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+
+  .card-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    transition: border-color 0.15s;
+  }
+  .card-item.has-price { border-color: #2a3a2a; }
+  .card-item.searching { border-color: #3a3a1a; }
+
+  .card-name {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  .card-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .tag.parallel { color: var(--accent); border-color: #3a3010; background: #1e1a08; }
+  .tag.signed { color: #7cb9e8; border-color: #102030; background: #081018; }
+
+  .card-price {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .price-val { font-size: 18px; font-weight: 700; color: var(--green); }
+  .price-val.empty { color: var(--muted); font-size: 14px; font-weight: 400; }
+  .price-src { font-size: 10px; color: var(--muted); flex: 1; }
+
+  .debug-toggle { font-size: 10px; color: var(--muted); cursor: pointer; text-decoration: underline; }
+  .debug-box {
+    background: #0a0a0a;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 10px;
+    color: #7cb9e8;
+    white-space: pre-wrap;
+    margin-top: 6px;
+    display: none;
+    line-height: 1.5;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  @media (max-width: 500px) {
+    .cards-grid { grid-template-columns: 1fr; }
+    .config-bar input { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🏒 Colectio<span>Pricer</span></div>
+  <div class="header-actions">
+    <button class="btn btn-ghost btn-sm" id="btnStop" style="display:none">⏹ Stop</button>
+    <button class="btn btn-primary" id="btnRun">Načíst & ocenit</button>
+  </div>
+</header>
+
+<main>
+  <div class="config-bar">
+    <div>
+      <label>Colectio Owner ID</label>
+      <input type="text" id="ownerId" value="12187" placeholder="napr. 12187">
+    </div>
+    <div>
+      <label>Max karet (0 = vše)</label>
+      <input type="number" id="maxCards" value="10" min="0" max="9999">
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btnTest">🧪 Test 5 karet</button>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-val" id="statTotal">—</div>
+      <div class="stat-label">Karet celkem</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="statPriced">—</div>
+      <div class="stat-label">Oceněno</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="statSkipped">—</div>
+      <div class="stat-label">Bez ceny</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="statAvg">—</div>
+      <div class="stat-label">Průměr Kč</div>
+    </div>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-text">
+      <span id="progressLabel">Načítám karty…</span>
+      <span id="progressCount">0 / 0</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <div class="filter-bar">
+    <input type="text" id="filterInput" placeholder="🔍 Filtruj karty…" oninput="filterCards()">
+  </div>
+
+  <div class="cards-grid" id="cardsGrid">
+    <div class="empty-state">
+      <div class="icon">🃏</div>
+      <p>Zadej Owner ID a klikni na Načíst & ocenit</p>
+    </div>
+  </div>
+</main>
+
+<script>
+const USD_CZK = 23.5;
+let allCards = [];
+let stopFlag = false;
+
+// ── Colectio API ──────────────────────────────────────────────────────────────
+async function loadCards(ownerId, limit) {
+  const cards = [];
+  let page = 0;
+  const perPage = 40;
+
+  while (true) {
+    const url = `https://api.colectio.com/api-public/collection/collection-item-elastic?page=${page}&perPage=${perPage}&ownerId=${ownerId}&sellable=false&sort=newestFirst&webPrefixCode=cz&primaryCurrencyId=1`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`Colectio API ${r.status}`);
+    const data = await r.json();
+    const items = data.items || [];
+    if (!items.length) break;
+
+    for (const item of items) {
+      const card = parseItem(item);
+      if (card) cards.push(card);
+      if (limit > 0 && cards.length >= limit) return cards;
+    }
+
+    if (cards.length >= data.totalItems || items.length < perPage) break;
+    page++;
+  }
+  return cards;
+}
+
+function parseItem(item) {
+  const id = String(item.itemId);
+  const name = (item.name || '').trim();
+  if (!name || !id) return null;
+
+  const params = {};
+  for (const p of (item.parameters || [])) params[p.name] = p.value;
+
+  const player = params['Sportovec'] || null;
+  const year   = params['Sezóna'] || null;
+  const set    = params['Set'] || null;
+  const cardNo = params['Číslo karty'] || null;
+  const signed = params['Podpis'];
+  const isAuto = signed && signed !== 'Ne' && signed !== 'Bez podpisu';
+
+  const printRun = parsePrintRun(name, set);
+  const parallel = parseParallel(name);
+
+  return { id, name, player, year, set, cardNo, isAuto, printRun, parallel, price: null, source: null, debug: null };
+}
+
+function parsePrintRun(name, set) {
+  const m = name.match(/(?:\s|^)(\d+)\/(\d+)(?:\s|$)/) || name.match(/\/(\d+)(?:\s|$)/);
+  if (m) return parseInt(m[2] || m[1]);
+  const n = name.toLowerCase();
+  if (n.includes('future watch limited')) return 100;
+  if (n.includes('future watch auto')) return 999;
+  if (n.includes('future watch')) return 999;
+  if (n.includes('gold spectrum')) return 10;
+  if (n.includes('red spectrum')) return 25;
+  if (n.includes('blue spectrum')) return 50;
+  if (n.includes('spectrum')) return 25;
+  if (n.includes('sunset')) return 50;
+  if (n.includes('speckle')) return 25;
+  if (n.includes('gold')) return 10;
+  if (n.includes('purple')) return 8;
+  if (n.includes('black')) return 1;
+  return null;
+}
+
+function parseParallel(name) {
+  const n = name.toLowerCase();
+  const pars = ['future watch limited','future watch auto','future watch','gold spectrum','red spectrum','blue spectrum','spectrum','sunset','speckle','gold','purple','black','red','blue','rainbow','teal','green','orange','silver','canvas','retro'];
+  for (const p of pars) if (n.includes(p)) return p;
+  return null;
+}
+
+function buildQuery(card) {
+  return [
+    card.player,
+    card.year,
+    card.set ? card.set.split(' ').slice(0,4).join(' ') : null,
+    card.cardNo ? '#' + card.cardNo : null,
+    card.printRun ? '/' + card.printRun : null,
+    card.isAuto ? 'auto' : null,
+  ].filter(Boolean).join(' ').slice(0, 100);
+}
+
+// ── eBay scraping přes CORS proxy ─────────────────────────────────────────────
+async function fetchEbayPrice(card) {
+  const q = buildQuery(card);
+  // Použijeme allorigins.win jako CORS proxy (zdarma)
+  const ebayUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&_sacat=212&LH_Sold=1&LH_Complete=1&_sop=12&_ipg=60`;
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ebayUrl)}`;
+
+  try {
+    const r = await fetch(proxyUrl);
+    if (!r.ok) return null;
+    const html = await r.text();
+
+    // Parsuj ceny z HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const prices = [];
+    // Nové selektory eBay
+    for (const el of doc.querySelectorAll('.s-card__price, .s-item__price')) {
+      if (el.classList.contains('strikethrough')) continue;
+      const raw = el.textContent.replace(/[\s,]/g, '');
+      const usd = raw.match(/\$(\d+\.?\d*)/);
+      const czk = raw.match(/(\d+\.?\d*)CZK/i);
+      if (czk) { const v = parseFloat(czk[1]); if (v > 5) prices.push({ val: v, cur: 'CZK' }); }
+      else if (usd) { const v = parseFloat(usd[1]); if (v > 0.5) prices.push({ val: v, cur: 'USD' }); }
+    }
+
+    if (!prices.length) return null;
+
+    // Spočítej průměr — preferuj CZK
+    const czks = prices.filter(p => p.cur === 'CZK');
+    const usds = prices.filter(p => p.cur === 'USD');
+    let priceCzk, count, label;
+
+    if (czks.length) {
+      czks.sort((a,b) => a.val - b.val);
+      const median = czks[Math.floor(czks.length / 2)].val;
+      priceCzk = Math.round(median);
+      count = czks.length;
+      label = `eBay sold (${count}x, ${median.toFixed(0)} Kč)`;
+    } else {
+      usds.sort((a,b) => a.val - b.val);
+      const median = usds[Math.floor(usds.length / 2)].val;
+      priceCzk = Math.round(median * USD_CZK);
+      count = usds.length;
+      label = `eBay sold (${count}x, $${median.toFixed(2)})`;
+    }
+
+    return { price: priceCzk, source: label, query: q };
+  } catch(e) {
+    console.warn('eBay fetch:', e.message);
+    return null;
+  }
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────────
+function renderCard(card) {
+  const div = document.createElement('div');
+  div.className = 'card-item' + (card.price ? ' has-price' : '');
+  div.dataset.id = card.id;
+  div.dataset.name = card.name.toLowerCase();
+
+  const tags = [];
+  if (card.parallel) tags.push(`<span class="tag parallel">${card.parallel}</span>`);
+  if (card.printRun) tags.push(`<span class="tag">/${card.printRun}</span>`);
+  if (card.isAuto) tags.push(`<span class="tag signed">✍ Auto</span>`);
+  if (card.year) tags.push(`<span class="tag">${card.year}</span>`);
+
+  const priceHtml = card.price
+    ? `<span class="price-val">${card.price} Kč</span><span class="price-src">${card.source || ''}</span>`
+    : `<span class="price-val empty" id="searching_${card.id}">—</span>`;
+
+  div.innerHTML = `
+    <div class="card-name">${escHtml(card.name)}</div>
+    ${tags.length ? `<div class="card-meta">${tags.join('')}</div>` : ''}
+    <div class="card-price">${priceHtml}</div>
+    ${card.debug ? `
+      <span class="debug-toggle" onclick="toggleDebug('${card.id}')">🔍 detail</span>
+      <pre class="debug-box" id="debug_${card.id}">${escHtml(card.debug)}</pre>
+    ` : ''}
+  `;
+  return div;
+}
+
+function toggleDebug(id) {
+  const el = document.getElementById('debug_' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function updateCardPrice(card) {
+  const div = document.querySelector(`[data-id="${card.id}"]`);
+  if (!div) return;
+  div.classList.toggle('has-price', !!card.price);
+
+  const searching = div.querySelector(`#searching_${card.id}`);
+  if (searching) {
+    const priceSpan = document.createElement('span');
+    priceSpan.className = 'price-val' + (card.price ? '' : ' empty');
+    priceSpan.textContent = card.price ? card.price + ' Kč' : '— nenalezeno';
+    searching.replaceWith(priceSpan);
+
+    if (card.source) {
+      const src = document.createElement('span');
+      src.className = 'price-src';
+      src.textContent = card.source;
+      div.querySelector('.card-price').appendChild(src);
+    }
+  }
+
+  if (card.debug) {
+    const priceDiv = div.querySelector('.card-price');
+    const toggle = document.createElement('span');
+    toggle.className = 'debug-toggle';
+    toggle.textContent = '🔍 detail';
+    toggle.onclick = () => toggleDebug(card.id);
+    const pre = document.createElement('pre');
+    pre.className = 'debug-box';
+    pre.id = 'debug_' + card.id;
+    pre.style.display = 'none';
+    pre.textContent = card.debug;
+    priceDiv.after(toggle, pre);
+  }
+}
+
+function updateStats() {
+  const priced = allCards.filter(c => c.price);
+  const skipped = allCards.filter(c => c.price === null && c.searched);
+  const avg = priced.length ? Math.round(priced.reduce((s,c) => s + c.price, 0) / priced.length) : null;
+
+  document.getElementById('statTotal').textContent = allCards.length;
+  document.getElementById('statPriced').textContent = priced.length;
+  document.getElementById('statSkipped').textContent = skipped.length;
+  document.getElementById('statAvg').textContent = avg ? avg + ' Kč' : '—';
+}
+
+function setProgress(done, total, label) {
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressCount').textContent = `${done} / ${total}`;
+  if (label) document.getElementById('progressLabel').textContent = label;
+}
+
+function filterCards() {
+  const q = document.getElementById('filterInput').value.toLowerCase();
+  for (const div of document.querySelectorAll('.card-item')) {
+    div.style.display = !q || div.dataset.name.includes(q) ? '' : 'none';
+  }
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Hlavní běh ────────────────────────────────────────────────────────────────
+async function run(mode) {
+  const ownerId = document.getElementById('ownerId').value.trim();
+  if (!ownerId) { alert('Zadej Owner ID'); return; }
+
+  stopFlag = false;
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('btnTest').disabled = true;
+  document.getElementById('btnStop').style.display = '';
+  document.getElementById('progressWrap').style.display = '';
+  document.getElementById('cardsGrid').innerHTML = '';
+  allCards = [];
+
+  try {
+    // 1. Načti karty
+    setProgress(0, 1, 'Načítám karty z Colectio…');
+    const limit = mode === 'test' ? 5 : parseInt(document.getElementById('maxCards').value) || 0;
+    const cards = await loadCards(ownerId, limit);
+    allCards = cards;
+
+    // Zobraz karty
+    const grid = document.getElementById('cardsGrid');
+    for (const card of cards) {
+      grid.appendChild(renderCard(card));
+    }
+    updateStats();
+
+    // 2. Hledej ceny
+    for (let i = 0; i < cards.length; i++) {
+      if (stopFlag) break;
+      const card = cards[i];
+      setProgress(i, cards.length, `Hledám: ${card.player || card.name.slice(0,30)}…`);
+
+      // Označ jako hledající
+      const searchEl = document.getElementById('searching_' + card.id);
+      if (searchEl) searchEl.innerHTML = '<span class="spinner"></span>';
+
+      const result = await fetchEbayPrice(card);
+      card.searched = true;
+
+      if (result) {
+        card.price = result.price;
+        card.source = result.source;
+        card.debug = `Query: "${result.query}"\nPrint run: ${card.printRun ? '/'+card.printRun : '?'}\nParallel: ${card.parallel || '—'}\neBay: ${result.price} Kč`;
+      } else {
+        card.debug = `Query: "${buildQuery(card)}"\nPrint run: ${card.printRun ? '/'+card.printRun : '?'}\nParallel: ${card.parallel || '—'}\neBay: nenalezeno`;
+      }
+
+      updateCardPrice(card);
+      updateStats();
+
+      // Pauza aby nebyl spam
+      await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
+    }
+
+    setProgress(cards.length, cards.length, stopFlag ? 'Zastaveno' : 'Hotovo!');
+
+  } catch(e) {
+    alert('Chyba: ' + e.message);
+    console.error(e);
+  } finally {
+    document.getElementById('btnRun').disabled = false;
+    document.getElementById('btnTest').disabled = false;
+    document.getElementById('btnStop').style.display = 'none';
+  }
+}
+
+document.getElementById('btnRun').addEventListener('click', () => run('full'));
+document.getElementById('btnTest').addEventListener('click', () => run('test'));
+document.getElementById('btnStop').addEventListener('click', () => { stopFlag = true; });
+</script>
+</body>
+</html>
