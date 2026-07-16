@@ -473,50 +473,15 @@ async function fetchEbayFinding(card, q) {
 }
 
 async function fetchEbayRss(card, q) {
-  // eBay sold listings přes allorigins proxy (vrací JSON s .contents)
-  const ebayUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=60&_sacat=212`;
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ebayUrl)}`;
+  // Cloudflare Worker proxy - parsuje eBay sold listings server-side
+  const workerUrl = `https://ebay-proxy.tomasbita.workers.dev/?q=${encodeURIComponent(q)}`;
 
   try {
-    const r = await fetch(proxyUrl);
+    const r = await fetch(workerUrl);
     if (!r.ok) return null;
-    const json = await r.json();
-    const html = json.contents;
-    if (!html) return null;
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-
-    const playerLast = (card.player || '').toLowerCase().split(' ').pop();
-    const prices = [];
-
-    for (const item of doc.querySelectorAll('.s-item')) {
-      // Přeskoč banner "Shop on eBay"
-      if (item.querySelector('.s-item__title--is-blank')) continue;
-
-      const titleEl = item.querySelector('.s-item__title');
-      const title = (titleEl?.textContent || '').replace('New Listing', '').toLowerCase().trim();
-      if (!title) continue;
-
-      // Musí obsahovat příjmení hráče
-      if (playerLast && playerLast.length > 2 && !title.includes(playerLast)) continue;
-
-      const priceEl = item.querySelector('.s-item__price');
-      if (!priceEl) continue;
-
-      const raw = priceEl.textContent.trim();
-      const czk = raw.match(/([\d\s]+[.,]?\d*)\s*Kč/i) || raw.match(/CZK\s*([\d.,]+)/i);
-      const usd = raw.match(/\$([\d.,]+)/);
-
-      if (czk) {
-        const v = parseFloat(czk[1].replace(/\s/g, '').replace(',', '.'));
-        if (v > 2 && v < 100000) prices.push({ val: v, cur: 'CZK' });
-      } else if (usd) {
-        const v = parseFloat(usd[1].replace(',', ''));
-        if (v > 0.1 && v < 5000) prices.push({ val: v, cur: 'USD' });
-      }
-    }
-
+    const data = await r.json();
+    
+    const prices = data.prices || [];
     if (!prices.length) return null;
 
     const czks = prices.filter(p => p.cur === 'CZK');
@@ -532,7 +497,7 @@ async function fetchEbayRss(card, q) {
     }
     return null;
   } catch(e) {
-    console.warn('eBay scraping:', e.message);
+    console.warn('Worker:', e.message);
     return null;
   }
 }
