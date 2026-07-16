@@ -375,55 +375,29 @@ function buildQuery(card) {
 }
 
 // ── eBay scraping přes CORS proxy ─────────────────────────────────────────────
-async function fetchEbayPrice(card, q) {
-  q = q || buildQuery(card);
-  
-  // eBay Browse API s Application tokenem
-  const ebayToken = "v^1.1#i^1#I^3#r^0#p^1#f^0#t^H4sIAAAAAAAA/+VYe2wURRi/6wsLAlEbQBQ5tpQo9fZmd29371bu5GhLejzawh2F1kCztzvXLt3b3ezsWY4YUhtAHkYEJZrQhCZGAonPgDGIihATEy2IiglGwWj8AwkG08jrD9DZbSnXioD0iJd4/1zmm2+++X6/+R6zAzpLSmeur11/cax7VEFPJ+gscLupMaC0pLhyXGHB5GIXyFJw93RO7yzqKjw9C4kp1RAWQ2ToGoKeVSlVQ4IjDBFpUxN0ESlI0MQURIIlCbHIwgUCTQLBMHVLl3SV8ESrQwSUElyAphm/LIowgWXaNYtxPUQEJQoEOcbPsUlZlvgknkcoDaMaskTNChE0oDkv4L0UF6dYgfELgCGZAGgmPI3QRIquYRUSEGHHWcFZa2Z5enNHRYSgaWEjRDgamRurj0Sra+ris3xZtsIDLMQs0UqjoaMqXYaeRlFNw5tvgxxtIZaWJIgQ4Qv37zDUqBC55swduO8QnUjyLC/7ZU4GHM0H+JxQOVc3U6J1cz9siSJ7k46qADVLsTK3YhSzkVgJJWtgVIdNRKs99t+itKgqSQWaIaJmTqQp0tBAhON6ao5iadCLowovUnRvw+Jqr8zRbICjoN/LAIlhaUYc2Kjf2gDNw3aq0jVZsUlDnjrdmgOx13A4N3QWN1ipXqs3I0nL9ihbj7/GIedvtg+1/xTTVptmnytMYSI8zvDWJzC42rJMJZG24KCF4RMORSFCNAxFJoZPOrE4ED6rUIhosyxD8Pk6OjrIDobUzVYfDQDlW7ZwQUxqgymRcHTtXLf1lVsv8CoOFAnilUgRrIyBfVmFYxU7oLUSYQ7QvJ8d4H2oW+Hh0r8JsjD7hmZErjKE5UVWZANBlk/IMBgEuciQ8ECQ+mw/YELMeFOi2Q4tQxUlO141lE5BU5EFhk3STCAJcdgGk15/MJn0JliZ81JJCAGEiYQUDPyfEuV2Qz0GJRNaOYr1HMU5XSnRHXNraFDV1FRttcGlarTBjGVkfeW81dQSCzTJvkVtdNMSvtEfut1suCH4KlXBzMTx/rkhwM71XJFQqyMLyiOCF5N0AzboqiJl8uuAGVNuEE0rE4OqigUjAhkxjGiuanWO4P3LMnFnuHPZo/6T/nRDVMgO2fxCZa9H2IBoKKTdgUhJT/l00c51fP2wxS2O155/UByi5MMy3LAkSOK+JCdEqZ00oSjrmpoZEW8KvvnmFWsYZz8Jitx/ZSUdJkj0tIQRIz2NOUBkvX2Di+vtUMP90DJ1VYVmIzXiepBKpS0xocJ8Kww5SBBFzLNmTfEBP01xwM+MCJfktOKWfCtp/aW8qMvdcpfL+WIoqqn8wm6Yupy28Wp34ZPDN/T5I+xyflSX+zDocn9c4HaDWaCCKgfTSgqXFBXeOxkpFiQVMUkipVXD3/UmJNthxhAVs+AB1+ffflf3yIF5uzf+MrFz3XTfNte4rNeXnuVg0uD7S2khNSbrMQY8fH2mmBo/cSzNAZ7iKJbxA6YZlF+fLaImFJWdffC+7r0Xdl55aY12fvSfX1Zoe+oLwNhBJbe72IVDxWU8w27+Ysvo52pr4nsvxoVtvcTBkhM/eye9Qk88vv2oa+ev4z+JTv09tmZC5fuuxm/OvNxcb755ZunWSen7Xz2K+BW76qf+0PG4PJWffepKD+We0lJ6rK9vE7P06kczz3U/1n3pqaOvtXcteLF1xpjxYMULRb0VJb3vLLq0qUX+7XhJ2da3H/rpvfm7aivilzeik/AedfmeP77uLjvpjR569uCBHZ+tuPyVr7y1Vx5Vs7+gMr6lc3Py/OHte/ZN2bBh3Fv8tN7Z4tpPTy9ruXDq+cSHdfvObZ18pO9JVqdO72++um7nwWPhH4+80do7I1HTB+c/caTxxFm1fPWhyu/XPrpux+Wy3dENr39QAfa923+WfwFKSq3ZFxMAAA==";
-  const searchUrl = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(q)}&category_ids=212&filter=buyingOptions:{FIXED_PRICE}&sort=price&limit=20`;
-  const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(searchUrl)}`;
+async function fetchEbayPrice(card) {
+  const q = buildQuery(card);
+  const workerUrl = `https://ebay-proxy.tomasbita.workers.dev/?q=${encodeURIComponent(q)}`;
   
   try {
-    const r = await fetch(proxyUrl, {
-      headers: {
-        'Authorization': `Bearer ${ebayToken}`,
-        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
-      }
-    });
-    
-    if (r.ok) {
-      const data = await r.json();
-      const items = data.itemSummaries || [];
-      const playerLast = (card.player || '').toLowerCase().split(' ').pop();
-      const prices = [];
-      
-      for (const item of items) {
-        const title = (item.title || '').toLowerCase();
-        if (playerLast && playerLast.length > 2 && !title.includes(playerLast)) continue;
-        const val = parseFloat(item.price?.value || 0);
-        const cur = item.price?.currency || 'USD';
-        if (val > 0.1 && val < 10000) prices.push({ val, cur });
-      }
-      
-      if (prices.length) {
-        const czks = prices.filter(p => p.cur === 'CZK');
-        const usds = prices.filter(p => p.cur === 'USD');
-        const calcMedian = arr => { arr.sort((a,b) => a.val-b.val); return arr[Math.floor(arr.length/2)].val; };
-        
-        if (czks.length) {
-          const m = calcMedian(czks);
-          return { price: Math.round(m), source: `eBay Browse (${czks.length}x, ${m.toFixed(0)} Kč)`, query: q };
-        } else if (usds.length) {
-          const m = calcMedian(usds);
-          return { price: Math.round(m * USD_CZK), source: `eBay Browse (${usds.length}x, $${m.toFixed(2)})`, query: q };
-        }
-      }
-    }
+    const r = await fetch(workerUrl);
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data.error || !data.count || data.count < 2) return null;
+
+    const median = data.median_czk;
+    if (!median) return null;
+
+    return { 
+      price: median, 
+      source: `eBay sold (${data.count}x, $${data.median_usd?.toFixed(2)})`, 
+      query: q,
+      debug: `Query: "${q}"\nPrint run: ${card.printRun ? '/'+card.printRun : '?'}\nParallel: ${card.parallel || '—'}\nSerpAPI: ${data.count}x, medián $${data.median_usd?.toFixed(2)} = ${median} Kč`
+    };
   } catch(e) {
-    console.warn('Browse API:', e.message);
+    console.warn('Worker:', e.message);
+    return null;
   }
-  
-  return await fetchEbayRss(card, q);
 }
 
 async function fetchEbayFinding(card, q) {
