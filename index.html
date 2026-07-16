@@ -473,28 +473,43 @@ async function fetchEbayFinding(card, q) {
 }
 
 async function fetchEbayRss(card, q) {
+  // eBay sold listings přes allorigins proxy (vrací JSON s .contents)
+  const ebayUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=60&_sacat=212`;
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ebayUrl)}`;
+
   try {
-    const ebayRssUrl = `https://rss.ebay.com/rss2?satitle=${encodeURIComponent(q)}&sacat=212&LH_Sold=1&LH_Complete=1`;
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ebayRssUrl)}`;
     const r = await fetch(proxyUrl);
     if (!r.ok) return null;
-    const html = await r.text();
+    const json = await r.json();
+    const html = json.contents;
+    if (!html) return null;
 
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/xml');
+    const doc = parser.parseFromString(html, 'text/html');
+
     const playerLast = (card.player || '').toLowerCase().split(' ').pop();
     const prices = [];
 
-    for (const item of doc.querySelectorAll('item')) {
-      const title = (item.querySelector('title')?.textContent || '').toLowerCase();
+    for (const item of doc.querySelectorAll('.s-item')) {
+      // Přeskoč banner "Shop on eBay"
+      if (item.querySelector('.s-item__title--is-blank')) continue;
+
+      const titleEl = item.querySelector('.s-item__title');
+      const title = (titleEl?.textContent || '').replace('New Listing', '').toLowerCase().trim();
       if (!title) continue;
+
+      // Musí obsahovat příjmení hráče
       if (playerLast && playerLast.length > 2 && !title.includes(playerLast)) continue;
-      const desc = item.querySelector('description')?.textContent || '';
-      const fullText = title + ' ' + desc;
-      const czk = fullText.match(/CZK\s*([\d,.]+)/i) || fullText.match(/([\d,.]+)\s*CZK/i);
-      const usd = fullText.match(/\$([\d,.]+)/);
+
+      const priceEl = item.querySelector('.s-item__price');
+      if (!priceEl) continue;
+
+      const raw = priceEl.textContent.trim();
+      const czk = raw.match(/([\d\s]+[.,]?\d*)\s*Kč/i) || raw.match(/CZK\s*([\d.,]+)/i);
+      const usd = raw.match(/\$([\d.,]+)/);
+
       if (czk) {
-        const v = parseFloat(czk[1].replace(',', ''));
+        const v = parseFloat(czk[1].replace(/\s/g, '').replace(',', '.'));
         if (v > 2 && v < 100000) prices.push({ val: v, cur: 'CZK' });
       } else if (usd) {
         const v = parseFloat(usd[1].replace(',', ''));
@@ -503,108 +518,25 @@ async function fetchEbayRss(card, q) {
     }
 
     if (!prices.length) return null;
+
     const czks = prices.filter(p => p.cur === 'CZK');
     const usds = prices.filter(p => p.cur === 'USD');
     const calcMedian = arr => { arr.sort((a,b) => a.val-b.val); return arr[Math.floor(arr.length/2)].val; };
+
     if (czks.length) {
       const m = calcMedian(czks);
-      return { price: Math.round(m), source: `eBay RSS (${czks.length}x, ${m.toFixed(0)} Kč)`, query: q };
+      return { price: Math.round(m), source: `eBay sold (${czks.length}x, ${m.toFixed(0)} Kč)`, query: q };
     } else if (usds.length) {
       const m = calcMedian(usds);
-      return { price: Math.round(m * USD_CZK), source: `eBay RSS (${usds.length}x, $${m.toFixed(2)})`, query: q };
+      return { price: Math.round(m * USD_CZK), source: `eBay sold (${usds.length}x, $${m.toFixed(2)})`, query: q };
     }
     return null;
-  } catch(e) { return null; }
-}
-
-// ── UI funkce ────────────────────────────────────────────────────────────────
-function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function toggleDebug(id) {
-  const el = document.getElementById('debug_' + id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-function filterCards() {
-  const q = document.getElementById('filterInput').value.toLowerCase();
-  for (const div of document.querySelectorAll('.card-item')) {
-    div.style.display = !q || div.dataset.name.includes(q) ? '' : 'none';
+  } catch(e) {
+    console.warn('eBay scraping:', e.message);
+    return null;
   }
 }
 
-function renderCard(card) {
-  const div = document.createElement('div');
-  div.className = 'card-item';
-  div.dataset.id = card.id;
-  div.dataset.name = card.name.toLowerCase();
-
-  const tags = [];
-  if (card.parallel) tags.push(`<span class="tag parallel">${card.parallel}</span>`);
-  if (card.printRun) tags.push(`<span class="tag">/${card.printRun}</span>`);
-  if (card.isAuto) tags.push(`<span class="tag signed">✍ Auto</span>`);
-  if (card.year) tags.push(`<span class="tag">${card.year}</span>`);
-
-  div.innerHTML = `
-    <div class="card-name">${escHtml(card.name)}</div>
-    ${tags.length ? `<div class="card-meta">${tags.join('')}</div>` : ''}
-    <div class="card-price">
-      <span class="price-val empty" id="searching_${card.id}">—</span>
-    </div>`;
-  return div;
-}
-
-function updateCardPrice(card) {
-  const div = document.querySelector(`[data-id="${card.id}"]`);
-  if (!div) return;
-  div.classList.toggle('has-price', !!card.price);
-
-  const searching = div.querySelector(`#searching_${card.id}`);
-  if (searching) {
-    searching.className = 'price-val' + (card.price ? '' : ' empty');
-    searching.textContent = card.price ? card.price + ' Kč' : '— nenalezeno';
-    searching.removeAttribute('id');
-  }
-
-  if (card.source) {
-    const src = document.createElement('span');
-    src.className = 'price-src';
-    src.textContent = card.source;
-    div.querySelector('.card-price').appendChild(src);
-  }
-
-  if (card.debug) {
-    const toggle = document.createElement('span');
-    toggle.className = 'debug-toggle';
-    toggle.textContent = '🔍 detail';
-    toggle.onclick = () => toggleDebug(card.id);
-    const pre = document.createElement('pre');
-    pre.className = 'debug-box';
-    pre.id = 'debug_' + card.id;
-    pre.style.display = 'none';
-    pre.textContent = card.debug;
-    div.querySelector('.card-price').after(toggle, pre);
-  }
-}
-
-function updateStats() {
-  const priced = allCards.filter(c => c.price);
-  const skipped = allCards.filter(c => c.price === null && c.searched);
-  const avg = priced.length ? Math.round(priced.reduce((s,c) => s + c.price, 0) / priced.length) : null;
-  document.getElementById('statTotal').textContent = allCards.length;
-  document.getElementById('statPriced').textContent = priced.length;
-  document.getElementById('statSkipped').textContent = skipped.length;
-  document.getElementById('statAvg').textContent = avg ? avg + ' Kč' : '—';
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function setProgress(done, total, label) {
-  const pct = total ? Math.round(done / total * 100) : 0;
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressCount').textContent = `${done} / ${total}`;
-  if (label) document.getElementById('progressLabel').textContent = label;
-}
 
 // ── Hlavní běh ────────────────────────────────────────────────────────────────
 async function run(mode) {
