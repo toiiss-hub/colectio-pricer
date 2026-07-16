@@ -379,7 +379,7 @@ async function fetchEbayPrice(card) {
   const q = buildQuery(card);
   // Použijeme allorigins.win jako CORS proxy (zdarma)
   const ebayUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&_sacat=212&LH_Sold=1&LH_Complete=1&_sop=12&_ipg=60`;
-  const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(ebayUrl)}`;
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ebayUrl)}`;
 
   try {
     const r = await fetch(proxyUrl);
