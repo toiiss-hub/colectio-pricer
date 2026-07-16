@@ -386,32 +386,31 @@ async function fetchEbayPrice(card) {
     if (!r.ok) return null;
     const html = await r.text();
 
+    // Parsuj RSS XML
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+    const doc = parser.parseFromString(html, 'text/xml');
 
     const playerLast = (card.player || '').toLowerCase().split(' ').pop();
     const prices = [];
 
-    for (const item of doc.querySelectorAll('.s-item')) {
-      const titleEl = item.querySelector('.s-item__title');
-      const title = (titleEl?.textContent || '').toLowerCase();
-      if (!title || title.includes('shop on ebay')) continue;
-
-      // Musí obsahovat příjmení hráče
+    const items = doc.querySelectorAll('item');
+    for (const item of items) {
+      const title = (item.querySelector('title')?.textContent || '').toLowerCase();
+      if (!title) continue;
       if (playerLast && playerLast.length > 2 && !title.includes(playerLast)) continue;
 
-      const priceEl = item.querySelector('.s-card__price, .s-item__price');
-      if (!priceEl || priceEl.classList.contains('strikethrough')) continue;
+      // Cena je v description nebo title: "$12.50" nebo "CZK 285"
+      const desc = item.querySelector('description')?.textContent || '';
+      const fullText = title + ' ' + desc;
 
-      const raw = priceEl.textContent.replace(/\s/g, '');
-      const czk = raw.match(/(\d+[.,]?\d*)CZK/i);
-      const usd = raw.match(/\$(\d+[.,]?\d*)/);
+      const czk = fullText.match(/CZK\s*([\d,.]+)/i) || fullText.match(/([\d,.]+)\s*CZK/i);
+      const usd = fullText.match(/\$([\d,.]+)/);
 
       if (czk) {
-        const v = parseFloat(czk[1].replace(',', '.'));
+        const v = parseFloat(czk[1].replace(',', ''));
         if (v > 2 && v < 100000) prices.push({ val: v, cur: 'CZK' });
       } else if (usd) {
-        const v = parseFloat(usd[1].replace(',', '.'));
+        const v = parseFloat(usd[1].replace(',', ''));
         if (v > 0.1 && v < 5000) prices.push({ val: v, cur: 'USD' });
       }
     }
