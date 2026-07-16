@@ -426,6 +426,52 @@ async function fetchEbayPrice(card, q) {
   return await fetchEbayRss(card, q);
 }
 
+async function fetchEbayFinding(card, q) {
+  // eBay Finding API - sold listings, volá se přímo z prohlížeče
+  const appId = "TomBitne-colectio-PRD-d625861e4-30c3523a";
+  const url = `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=findCompletedItems&SERVICE-VERSION=1.0.0&SECURITY-APPNAME=${appId}&RESPONSE-DATA-FORMAT=JSON&keywords=${encodeURIComponent(q)}&categoryId=212&itemFilter%280%29.name=SoldItemsOnly&itemFilter%280%29.value=true&paginationInput.entriesPerPage=20&sortOrder=EndTimeSoonest`;
+  
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = await r.json();
+    const items = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
+    
+    const playerLast = (card.player || '').toLowerCase().split(' ').pop();
+    const prices = [];
+    
+    for (const item of items) {
+      const title = (item.title?.[0] || '').toLowerCase();
+      if (playerLast && playerLast.length > 2 && !title.includes(playerLast)) continue;
+      
+      const priceVal = item.sellingStatus?.[0]?.currentPrice?.[0]?.__value__;
+      const currency = item.sellingStatus?.[0]?.currentPrice?.[0]?.['@currencyId'] || 'USD';
+      
+      if (priceVal) {
+        const v = parseFloat(priceVal);
+        if (v > 0.1 && v < 5000) prices.push({ val: v, cur: currency });
+      }
+    }
+    
+    if (!prices.length) return null;
+    
+    const czks = prices.filter(p => p.cur === 'CZK');
+    const usds = prices.filter(p => p.cur === 'USD');
+    const calcMedian = arr => { arr.sort((a,b) => a.val-b.val); return arr[Math.floor(arr.length/2)].val; };
+    
+    if (czks.length) {
+      const m = calcMedian(czks);
+      return { price: Math.round(m), source: `eBay sold (${czks.length}x, ${m.toFixed(0)} Kč)`, query: q };
+    } else if (usds.length) {
+      const m = calcMedian(usds);
+      return { price: Math.round(m * USD_CZK), source: `eBay sold (${usds.length}x, $${m.toFixed(2)})`, query: q };
+    }
+  } catch(e) {
+    console.warn('Finding API:', e.message);
+  }
+  return null;
+}
+
 async function fetchEbayRss(card, q) {
   try {
     const ebayRssUrl = `https://rss.ebay.com/rss2?satitle=${encodeURIComponent(q)}&sacat=212&LH_Sold=1&LH_Complete=1`;
