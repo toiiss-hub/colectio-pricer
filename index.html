@@ -473,29 +473,21 @@ async function fetchEbayFinding(card, q) {
 }
 
 async function fetchEbayRss(card, q) {
-  // Cloudflare Worker proxy - parsuje eBay sold listings server-side
   const workerUrl = `https://ebay-proxy.tomasbita.workers.dev/?q=${encodeURIComponent(q)}`;
-
   try {
     const r = await fetch(workerUrl);
     if (!r.ok) return null;
     const data = await r.json();
-    
-    const prices = data.prices || [];
-    if (!prices.length) return null;
+    if (data.error || !data.count) return null;
 
-    const czks = prices.filter(p => p.cur === 'CZK');
-    const usds = prices.filter(p => p.cur === 'USD');
-    const calcMedian = arr => { arr.sort((a,b) => a.val-b.val); return arr[Math.floor(arr.length/2)].val; };
+    const median = data.median_czk;
+    if (!median) return null;
 
-    if (czks.length) {
-      const m = calcMedian(czks);
-      return { price: Math.round(m), source: `eBay sold (${czks.length}x, ${m.toFixed(0)} Kč)`, query: q };
-    } else if (usds.length) {
-      const m = calcMedian(usds);
-      return { price: Math.round(m * USD_CZK), source: `eBay sold (${usds.length}x, $${m.toFixed(2)})`, query: q };
-    }
-    return null;
+    return { 
+      price: median, 
+      source: `eBay sold (${data.count}x, $${data.median_usd?.toFixed(2)})`, 
+      query: q 
+    };
   } catch(e) {
     console.warn('Worker:', e.message);
     return null;
