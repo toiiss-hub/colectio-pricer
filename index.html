@@ -495,6 +495,97 @@ async function fetchEbayRss(card, q) {
 }
 
 
+// ── UI funkce ────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toggleDebug(id) {
+  const el = document.getElementById('debug_' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function filterCards() {
+  const q = document.getElementById('filterInput').value.toLowerCase();
+  for (const div of document.querySelectorAll('.card-item')) {
+    div.style.display = !q || div.dataset.name.includes(q) ? '' : 'none';
+  }
+}
+
+function setProgress(done, total, label) {
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressCount').textContent = `${done} / ${total}`;
+  if (label) document.getElementById('progressLabel').textContent = label;
+}
+
+function renderCard(card) {
+  const div = document.createElement('div');
+  div.className = 'card-item';
+  div.dataset.id = card.id;
+  div.dataset.name = card.name.toLowerCase();
+
+  const tags = [];
+  if (card.parallel) tags.push(`<span class="tag parallel">${card.parallel}</span>`);
+  if (card.printRun) tags.push(`<span class="tag">/${card.printRun}</span>`);
+  if (card.isAuto) tags.push(`<span class="tag signed">✍ Auto</span>`);
+  if (card.year) tags.push(`<span class="tag">${card.year}</span>`);
+
+  div.innerHTML = `
+    <div class="card-name">${escHtml(card.name)}</div>
+    ${tags.length ? `<div class="card-meta">${tags.join('')}</div>` : ''}
+    <div class="card-price">
+      <span class="price-val empty" id="searching_${card.id}">—</span>
+    </div>`;
+  return div;
+}
+
+function updateCardPrice(card) {
+  const div = document.querySelector(`[data-id="${card.id}"]`);
+  if (!div) return;
+  div.classList.toggle('has-price', !!card.price);
+
+  const searching = div.querySelector(`#searching_${card.id}`);
+  if (searching) {
+    searching.className = 'price-val' + (card.price ? '' : ' empty');
+    searching.textContent = card.price ? card.price + ' Kč' : '— nenalezeno';
+    searching.removeAttribute('id');
+  }
+
+  if (card.source) {
+    const existing = div.querySelector('.price-src');
+    if (!existing) {
+      const src = document.createElement('span');
+      src.className = 'price-src';
+      src.textContent = card.source;
+      div.querySelector('.card-price').appendChild(src);
+    }
+  }
+
+  if (card.debug && !div.querySelector('.debug-toggle')) {
+    const toggle = document.createElement('span');
+    toggle.className = 'debug-toggle';
+    toggle.textContent = '🔍 detail';
+    toggle.onclick = () => toggleDebug(card.id);
+    const pre = document.createElement('pre');
+    pre.className = 'debug-box';
+    pre.id = 'debug_' + card.id;
+    pre.style.display = 'none';
+    pre.textContent = card.debug;
+    div.querySelector('.card-price').after(toggle, pre);
+  }
+}
+
+function updateStats() {
+  const priced = allCards.filter(c => c.price);
+  const skipped = allCards.filter(c => c.price === null && c.searched);
+  const avg = priced.length ? Math.round(priced.reduce((s,c) => s + c.price, 0) / priced.length) : null;
+  document.getElementById('statTotal').textContent = allCards.length;
+  document.getElementById('statPriced').textContent = priced.length;
+  document.getElementById('statSkipped').textContent = skipped.length;
+  document.getElementById('statAvg').textContent = avg ? avg + ' Kč' : '—';
+}
+
 // ── Hlavní běh ────────────────────────────────────────────────────────────────
 async function run(mode) {
   const ownerId = document.getElementById('ownerId').value.trim();
