@@ -471,6 +471,14 @@ async function fetchEbayRss(card, q) {
   } catch(e) { return null; }
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function setProgress(done, total, label) {
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressCount').textContent = `${done} / ${total}`;
+  if (label) document.getElementById('progressLabel').textContent = label;
+}
+
 // ── Hlavní běh ────────────────────────────────────────────────────────────────
 async function run(mode) {
   const ownerId = document.getElementById('ownerId').value.trim();
